@@ -109,7 +109,7 @@ app.post("/api/shorturl/", (req, res) => {
               //object not found - create a new object with the highest + 1 for short_link
               //display newly created object
               var newLink = new UrlModel({
-                original_url: myUrl.protocol + "//" + myUrl.host,
+                original_url: req.body.url,
                 short_url: highest + 1,
               });
               newLink.save((err, result) => {
