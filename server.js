@@ -9,6 +9,7 @@ const app = express();
 //use middleware to handle POST requests (body-parser)
 const bodyParser = require("body-parser");
 const { nextTick } = require("process");
+const { json } = require("body-parser");
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
@@ -26,7 +27,6 @@ mongoose.connect(
     console.log("Connection to DB Successfull!");
   }
 );
-const db = mongoose.connection;
 
 //define a URL schema
 const UrlSchema = new Schema({
@@ -61,10 +61,8 @@ app.get("/api/shorturl/:input", (req, res) => {
     } else {
       //data[0].original_url this is what we need
       try {
-        //console.log(data);
         res.redirect(data[0].original_url);
       } catch (err) {
-        //console.error(err);
         res.json({ error: "invalid url" });
       }
     }
@@ -73,6 +71,9 @@ app.get("/api/shorturl/:input", (req, res) => {
 
 app.post("/api/shorturl/", (req, res) => {
   //ok - https://www.google.com http://www.google.com
+
+  const invalidUrl = { error: "invalid url" };
+
   try {
     //parse input to URL - if parse is okay - input is valid url format
     var myUrl = new URL(req.body.url);
@@ -83,49 +84,47 @@ app.post("/api/shorturl/", (req, res) => {
       //3. if input is not in database - assign a new short link, otherwise - return current short link (object)
       if (err) {
         console.error(err);
-        res.json({ error: "invalid url" });
+        res.json(invalidUrl);
       } else {
         //try and find it in database
         var highest = 0;
         var existing = null;
-        UrlModel.find(
-          {},
-          { original_url: true, short_url: true, _id: false },
-          (error, data) => {
-            if (error) {
-              res.json({ error: error });
-            }
-            //determine which is the highest taken short link (number)
-            data.map((el) => {
-              if (highest < el.short_url) highest = el.short_url;
-              if (el.original_url === req.body.url) existing = el;
-            });
-            // Find if the array (data) contains the url by comparing the property value (req.body.url)
-            if (existing) {
-              //object existing - display object
-              res.json(existing);
-            } else {
-              //object not found - create a new object with the highest + 1 for short_link
-              //display newly created object
-              var newLink = new UrlModel({
-                original_url: myUrl.protocol + "//" + myUrl.host,
-                short_url: highest + 1,
-              });
-              newLink.save((err, result) => {
-                if (err) {
-                  res.json({ errorCreatingRecord: err });
-                } else {
-                  console.log("displaying newly created record..");
-                  res.json(result);
-                }
-              });
-            }
+        UrlModel.find({}, { _id: false, __v: false }, (error, data) => {
+          if (error) {
+            res.json({ error: error });
           }
-        );
+          //determine which is the highest taken short link (number)
+          data.map((el) => {
+            if (highest < el.short_url) highest = el.short_url;
+            if (el.original_url === req.body.url) existing = el;
+          });
+          // Find if the array (data) contains the url by comparing the property value (req.body.url)
+          if (existing) {
+            //object existing - display object
+            res.json(existing);
+          } else {
+            //object not found - create a new object with the highest + 1 for short_link
+            //display newly created object
+            var newLink = new UrlModel({
+              original_url: myUrl.protocol + "//" + myUrl.host,
+              short_url: highest + 1,
+            });
+            newLink.save((err, result) => {
+              if (err) {
+                res.json({ errorCreatingRecord: err });
+              } else {
+                res.json({
+                  original_url: result.original_url,
+                  short_url: result.short_url,
+                });
+              }
+            });
+          }
+        });
       }
     });
   } catch (error) {
-    res.json({ error: "invalid url" });
+    res.json(invalidUrl);
   }
 });
 
