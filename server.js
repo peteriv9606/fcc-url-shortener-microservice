@@ -87,40 +87,47 @@ app.post("/api/shorturl/", (req, res) => {
         res.json(invalidUrl);
       } else {
         //try and find it in database
-        var highest = 0;
-        var existing = null;
-        UrlModel.find({}, { _id: false, __v: false }, (error, data) => {
-          if (error) {
-            res.json({ error: error });
-          }
-          //determine which is the highest taken short link (number)
-          data.map((el) => {
-            if (highest < el.short_url) highest = el.short_url;
-            if (el.original_url === req.body.url) existing = el;
+        if (myUrl.protocol == "https:" || myUrl.protocol == "http:") {
+          //continue with program
+
+          var highest = 0;
+          var existing = null;
+          UrlModel.find({}, { _id: false, __v: false }, (error, data) => {
+            if (error) {
+              res.json({ error: error });
+            }
+            //determine which is the highest taken short link (number)
+            data.map((el) => {
+              if (highest < el.short_url) highest = el.short_url;
+              if (el.original_url === req.body.url) existing = el;
+            });
+            // Find if the array (data) contains the url by comparing the property value (req.body.url)
+            if (existing) {
+              //object existing - display object
+              res.json(existing);
+            } else {
+              //object not found - create a new object with the highest + 1 for short_link
+              //display newly created object
+              var newLink = new UrlModel({
+                original_url: myUrl.protocol + "//" + myUrl.host,
+                short_url: highest + 1,
+              });
+              newLink.save((err, result) => {
+                if (err) {
+                  res.json({ errorCreatingRecord: err });
+                } else {
+                  res.json({
+                    original_url: result.original_url,
+                    short_url: result.short_url,
+                  });
+                }
+              });
+            }
           });
-          // Find if the array (data) contains the url by comparing the property value (req.body.url)
-          if (existing) {
-            //object existing - display object
-            res.json(existing);
-          } else {
-            //object not found - create a new object with the highest + 1 for short_link
-            //display newly created object
-            var newLink = new UrlModel({
-              original_url: myUrl.protocol + "//" + myUrl.host,
-              short_url: highest + 1,
-            });
-            newLink.save((err, result) => {
-              if (err) {
-                res.json({ errorCreatingRecord: err });
-              } else {
-                res.json({
-                  original_url: result.original_url,
-                  short_url: result.short_url,
-                });
-              }
-            });
-          }
-        });
+        } else {
+          //invalid url
+          res.json(invalidUrl);
+        }
       }
     });
   } catch (error) {
